@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Problem, Room } from '../types';
 import { PROBLEMS_CATALOG } from '../data/problems';
 import { soundFx } from '../utils/audio';
+import { fetchRoomList, RoomSummary } from '../api/roomsApi';
 import {
   X,
   Plus,
@@ -34,35 +35,12 @@ const RANDOM_NAMES = [
   'LATAM-AGENTS-404'
 ];
 
-const PRESET_ROOMS = [
-  {
-    id: 'SALA-BLACKFRIDAY',
-    name: 'Sala Black Friday War Room',
-    problemId: 'black-friday-crash',
-    description: 'Crisis de deadlocks en PostgreSQL y checkout caído en compras masivas.',
-    emoji: '💥'
-  },
-  {
-    id: 'SALA-ZERO-DAY',
-    name: 'Sala Forense Zero-Day',
-    problemId: 'zero-day-cve',
-    description: 'Vulnerabilidad RCE crítica en librería JWT de autenticación.',
-    emoji: '🦠'
-  },
-  {
-    id: 'SALA-SPIDER-BOT',
-    name: 'Sala Inteligencia de Precios',
-    problemId: 'e-commerce-scraper',
-    description: 'Rastreo y scraping de precios de competidores con Puppeteer.',
-    emoji: '🕷️'
-  },
-  {
-    id: 'SALA-VIP-REFUND',
-    name: 'Sala Soporte & Reembolsos',
-    problemId: 'support-refund-bot',
-    description: 'Atención a clientes VIP y reembolsos automáticos en Stripe.',
-    emoji: '💸'
-  }
+// Suggested rooms, shown after the live rooms from the server
+const PRESET_ROOMS: RoomSummary[] = [
+  { id: 'SALA-BLACKFRIDAY', name: 'Sala Black Friday War Room', problemId: 'black-friday-crash' },
+  { id: 'SALA-ZERO-DAY', name: 'Sala Forense Zero-Day', problemId: 'zero-day-cve' },
+  { id: 'SALA-SPIDER-BOT', name: 'Sala Inteligencia de Precios', problemId: 'e-commerce-scraper' },
+  { id: 'SALA-VIP-REFUND', name: 'Sala Soporte & Reembolsos', problemId: 'support-refund-bot' }
 ];
 
 export const RoomModal: React.FC<RoomModalProps> = ({
@@ -83,6 +61,14 @@ export const RoomModal: React.FC<RoomModalProps> = ({
 
   // Join Tab state
   const [joinCode, setJoinCode] = useState('');
+
+  // Available rooms tab: live rooms from the server, refreshed each time the tab is shown
+  const [liveRooms, setLiveRooms] = useState<RoomSummary[]>([]);
+  useEffect(() => {
+    if (isOpen && tab === 'preset') fetchRoomList().then(setLiveRooms);
+  }, [isOpen, tab]);
+  const liveIds = new Set(liveRooms.map((r) => r.id));
+  const availableRooms = [...liveRooms, ...PRESET_ROOMS.filter((r) => !liveIds.has(r.id))];
 
   if (!isOpen) return null;
 
@@ -120,9 +106,11 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     onClose();
   };
 
-  const handleSelectPreset = (roomId: string, name: string, problemId: string) => {
+  const handleSelectPreset = (room: RoomSummary) => {
     soundFx.playCoin();
-    onSelectOrCreateRoom(roomId, name, problemId);
+    // Existing rooms are joined as-is; passing name/problem would overwrite the room's challenge
+    if (liveIds.has(room.id)) onSelectOrCreateRoom(room.id);
+    else onSelectOrCreateRoom(room.id, room.name, room.problemId);
     onClose();
   };
 
@@ -373,8 +361,9 @@ export const RoomModal: React.FC<RoomModalProps> = ({
               </p>
 
               <div className="grid grid-cols-1 gap-3">
-                {PRESET_ROOMS.map((room) => {
+                {availableRooms.map((room) => {
                   const isCurrent = room.id === currentRoomId;
+                  const roomProblem = PROBLEMS_CATALOG.find((p) => p.id === room.problemId);
                   return (
                     <div
                       key={room.id}
@@ -386,7 +375,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
                     >
                       <div className="flex items-start gap-3">
                         <span className="text-3xl p-2 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
-                          {room.emoji}
+                          {roomProblem?.emoji ?? '🎮'}
                         </span>
                         <div>
                           <div className="flex items-center gap-2">
@@ -401,13 +390,18 @@ export const RoomModal: React.FC<RoomModalProps> = ({
                             )}
                           </div>
                           <p className="text-xs text-slate-400 font-mono mt-1">
-                            {room.description}
+                            {roomProblem?.title}
                           </p>
+                          {liveIds.has(room.id) && (
+                            <p className="text-[10px] text-emerald-400 font-mono mt-1">
+                              {room.players} conectados · {room.submissions} arquitecturas
+                            </p>
+                          )}
                         </div>
                       </div>
 
                       <button
-                        onClick={() => handleSelectPreset(room.id, room.name, room.problemId)}
+                        onClick={() => handleSelectPreset(room)}
                         disabled={isCurrent}
                         className={`px-4 py-2 rounded-xl text-xs font-arcade tracking-wider transition-all flex items-center gap-1.5 shrink-0 justify-center ${
                           isCurrent

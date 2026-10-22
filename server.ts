@@ -40,6 +40,12 @@ async function getRoom(id: string): Promise<Room | undefined> {
   return rows[0]?.data;
 }
 
+async function listRooms(): Promise<Room[]> {
+  if (!pool) return [...memoryStore.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50);
+  const { rows } = await pool.query("SELECT data FROM rooms ORDER BY data->>'createdAt' DESC LIMIT 50");
+  return rows.map((r) => r.data);
+}
+
 // Read-modify-write under a row lock so concurrent requests on any instance don't lose updates.
 async function updateRoom(id: string, fn: (room: Room | undefined) => Room): Promise<Room> {
   if (!pool) {
@@ -114,6 +120,20 @@ async function startServer() {
   const route = (fn: express.RequestHandler) => (req: express.Request, res: express.Response, next: express.NextFunction) =>
     Promise.resolve(fn(req, res, next)).catch(next);
   const userIdOf = (req: express.Request) => String(req.get('x-user-id') || '');
+
+  // API: List rooms (newest first) for the room picker
+  app.get('/api/rooms', route(async (_req, res) => {
+    const now = Date.now();
+    const rooms = await listRooms();
+    res.json(rooms.map((r) => ({
+      id: r.id,
+      name: r.name,
+      problemId: r.problemId,
+      createdAt: r.createdAt,
+      players: r.participants.filter((p) => now - p.lastSeen < STALE_MS).length,
+      submissions: r.submissions.length
+    })));
+  }));
 
   // API: Get or create room
   app.get('/api/rooms/:roomId', route(async (req, res) => {

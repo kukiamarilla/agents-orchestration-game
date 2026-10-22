@@ -103,6 +103,22 @@ export async function fetchRoomData(roomId: string, defaultProblemId = 'black-fr
   return created;
 }
 
+export interface RoomSummary {
+  id: string;
+  name: string;
+  problemId: string;
+  players?: number;
+  submissions?: number;
+}
+
+export async function fetchRoomList(): Promise<RoomSummary[]> {
+  try {
+    const res = await fetch('/api/rooms', { headers: userHeaders });
+    if (res.ok) return await res.json();
+  } catch {}
+  return [];
+}
+
 export async function createNewRoom(roomId: string, name: string, problemId: string): Promise<Room> {
   try {
     const res = await fetch('/api/rooms', {
