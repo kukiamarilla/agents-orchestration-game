@@ -1,0 +1,8 @@
+{
+  "name": "Remix VibeAgent: MCP Arena",
+  "description": "Constructor visual de Agentes AI: Diseña agentes pixel art, equipa herramientas MCP ilimitadas, define directivas de prompt y relaciones de spawn, únete a salas con código QR y explora diagramas interactivos en equipo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
