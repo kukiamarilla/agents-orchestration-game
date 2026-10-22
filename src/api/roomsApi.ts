@@ -5,6 +5,23 @@ import { PROBLEMS_CATALOG } from '../data/problems';
 const STORAGE_PREFIX = 'vibeagent_room_';
 const CHANNEL_NAME = 'vibeagent_multiagent_rooms_channel';
 
+// Stable per-browser identity, so votes and presence are per person (not per display name)
+export const clientId: string = (() => {
+  const key = 'vibeagent_client_id';
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    // randomUUID is missing on non-HTTPS origins (e.g. LAN IP from the QR code)
+    const id = `usr-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36)}`;
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return `usr-${Math.random().toString(36).slice(2)}`;
+  }
+})();
+
+const userHeaders = { 'X-User-Id': clientId };
+
 // In-browser BroadcastChannel for multi-tab sync
 let broadcastChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -66,7 +83,7 @@ export function createDefaultRoom(roomId: string, problemId = 'black-friday-cras
 // API methods with fallback
 export async function fetchRoomData(roomId: string, defaultProblemId = 'black-friday-crash'): Promise<Room> {
   try {
-    const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}`);
+    const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}`, { headers: userHeaders });
     if (res.ok) {
       const data = await res.json();
       saveLocalRoom(data);
@@ -90,7 +107,7 @@ export async function createNewRoom(roomId: string, name: string, problemId: str
   try {
     const res = await fetch('/api/rooms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...userHeaders },
       body: JSON.stringify({ id: roomId, name, problemId })
     });
     if (res.ok) {
@@ -116,7 +133,7 @@ export async function submitMultiAgentDesign(roomId: string, design: MultiAgentD
   try {
     const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...userHeaders },
       body: JSON.stringify({ design })
     });
     if (res.ok) {
@@ -144,7 +161,7 @@ export async function voteMultiAgentDesign(roomId: string, designId: string): Pr
   try {
     const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/vote`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...userHeaders },
       body: JSON.stringify({ designId })
     });
     if (res.ok) {
@@ -175,7 +192,7 @@ export async function updateRoomProblem(roomId: string, problemId: string): Prom
   try {
     const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/problem`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...userHeaders },
       body: JSON.stringify({ problemId })
     });
     if (res.ok) {
@@ -195,7 +212,7 @@ export async function sendHeartbeat(roomId: string, participant: RoomParticipant
   try {
     await fetch(`/api/rooms/${encodeURIComponent(roomId)}/heartbeat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...userHeaders },
       body: JSON.stringify({ participant })
     });
   } catch {}

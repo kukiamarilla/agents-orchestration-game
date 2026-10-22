@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: vibeagent-arena
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vibeagent-db
+          property: connectionString
+
+databases:
+  - name: vibeagent-db
+    plan: free

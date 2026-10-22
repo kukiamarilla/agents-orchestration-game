@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
+import pg from 'pg';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { INITIAL_MULTI_AGENT_DESIGNS } from './src/data/communitySeed.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,166 +16,205 @@ interface Room {
   submissions: any[];
 }
 
-const roomsStore = new Map<string, Room>();
+const STALE_MS = 120000;
 
-// Seed default room
-roomsStore.set('SALA-BLACKFRIDAY', {
-  id: 'SALA-BLACKFRIDAY',
-  name: 'Sala Black Friday War Room',
-  problemId: 'black-friday-crash',
-  createdAt: new Date().toISOString(),
-  participants: [
-    {
-      id: 'bot-kuki',
-      name: 'Kuki Amarilla',
-      avatar: INITIAL_MULTI_AGENT_DESIGNS[0].authorAvatar,
-      lastSeen: Date.now()
-    },
-    {
-      id: 'bot-nery',
-      name: 'Nery Dev',
-      avatar: INITIAL_MULTI_AGENT_DESIGNS[1].authorAvatar,
-      lastSeen: Date.now()
-    }
-  ],
-  submissions: [...INITIAL_MULTI_AGENT_DESIGNS]
-});
+function blankRoom(id: string, problemId = 'black-friday-crash', submissions: any[] = []): Room {
+  return {
+    id,
+    name: `Sala ${id}`,
+    problemId,
+    createdAt: new Date().toISOString(),
+    participants: [],
+    submissions
+  };
+}
+
+// Rooms live in Postgres when DATABASE_URL is set (survives restarts, shared across instances),
+// otherwise in memory for local dev.
+const pool = process.env.DATABASE_URL ? new pg.Pool({ connectionString: process.env.DATABASE_URL }) : null;
+const memoryStore = new Map<string, Room>();
+
+async function getRoom(id: string): Promise<Room | undefined> {
+  if (!pool) return memoryStore.get(id);
+  const { rows } = await pool.query('SELECT data FROM rooms WHERE id = $1', [id]);
+  return rows[0]?.data;
+}
+
+// Read-modify-write under a row lock so concurrent requests on any instance don't lose updates.
+async function updateRoom(id: string, fn: (room: Room | undefined) => Room): Promise<Room> {
+  if (!pool) {
+    const room = fn(memoryStore.get(id));
+    memoryStore.set(id, room);
+    return room;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT data FROM rooms WHERE id = $1 FOR UPDATE', [id]);
+    const room = fn(rows[0]?.data);
+    await client.query(
+      'INSERT INTO rooms (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
+      [id, room]
+    );
+    await client.query('COMMIT');
+    return room;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Votes are tracked per user in `voters`; each response is personalized with that user's hasVoted.
+function viewFor(room: Room, userId: string): Room {
+  const now = Date.now();
+  return {
+    ...room,
+    participants: room.participants.filter((p) => now - p.lastSeen < STALE_MS),
+    submissions: room.submissions.map(({ voters = [], ...sub }) => ({
+      ...sub,
+      hasVoted: voters.includes(userId)
+    }))
+  };
+}
+
+async function initStore() {
+  if (pool) {
+    await pool.query('CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, data JSONB NOT NULL)');
+  }
+  // Seed default room
+  await updateRoom('SALA-BLACKFRIDAY', (room) => room ?? {
+    ...blankRoom('SALA-BLACKFRIDAY', 'black-friday-crash', [...INITIAL_MULTI_AGENT_DESIGNS]),
+    name: 'Sala Black Friday War Room',
+    participants: [
+      {
+        id: 'bot-kuki',
+        name: 'Kuki Amarilla',
+        avatar: INITIAL_MULTI_AGENT_DESIGNS[0].authorAvatar,
+        lastSeen: Date.now()
+      },
+      {
+        id: 'bot-nery',
+        name: 'Nery Dev',
+        avatar: INITIAL_MULTI_AGENT_DESIGNS[1].authorAvatar,
+        lastSeen: Date.now()
+      }
+    ]
+  });
+}
 
 async function startServer() {
+  await initStore();
+
   const app = express();
   app.use(express.json());
 
+  // Express 4 doesn't catch async errors; forward them so a DB failure returns 500 instead of crashing
+  const route = (fn: express.RequestHandler) => (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+  const userIdOf = (req: express.Request) => String(req.get('x-user-id') || '');
+
   // API: Get or create room
-  app.get('/api/rooms/:roomId', (req, res) => {
+  app.get('/api/rooms/:roomId', route(async (req, res) => {
     const { roomId } = req.params;
-    let room = roomsStore.get(roomId);
-    if (!room) {
-      room = {
-        id: roomId,
-        name: `Sala ${roomId}`,
-        problemId: 'black-friday-crash',
-        createdAt: new Date().toISOString(),
-        participants: [],
-        submissions: INITIAL_MULTI_AGENT_DESIGNS.filter(
-          (d) => d.problemId === 'black-friday-crash'
-        )
-      };
-      roomsStore.set(roomId, room);
-    }
-    // Clean stale participants (> 2 min)
-    const now = Date.now();
-    room.participants = room.participants.filter((p) => now - p.lastSeen < 120000);
-    res.json(room);
-  });
+    const room =
+      (await getRoom(roomId)) ??
+      (await updateRoom(roomId, (r) => r ?? blankRoom(roomId, 'black-friday-crash',
+        INITIAL_MULTI_AGENT_DESIGNS.filter((d) => d.problemId === 'black-friday-crash'))));
+    res.json(viewFor(room, userIdOf(req)));
+  }));
 
   // API: Create new room
-  app.post('/api/rooms', (req, res) => {
+  app.post('/api/rooms', route(async (req, res) => {
     const { id, name, problemId } = req.body;
     const roomId = (id || `SALA-${Date.now().toString(36).toUpperCase()}`).toUpperCase();
-    let room = roomsStore.get(roomId);
-    if (!room) {
-      room = {
-        id: roomId,
-        name: name || `Sala ${roomId}`,
-        problemId: problemId || 'black-friday-crash',
-        createdAt: new Date().toISOString(),
-        participants: [],
-        submissions: []
-      };
-      roomsStore.set(roomId, room);
-    } else {
-      if (problemId) room.problemId = problemId;
-      if (name) room.name = name;
-    }
-    res.json(room);
-  });
+    const room = await updateRoom(roomId, (r) => {
+      const next = r ?? blankRoom(roomId, problemId || 'black-friday-crash');
+      if (problemId) next.problemId = problemId;
+      if (name) next.name = name;
+      return next;
+    });
+    res.json(viewFor(room, userIdOf(req)));
+  }));
 
   // API: Submit multi-agent design
-  app.post('/api/rooms/:roomId/submit', (req, res) => {
+  app.post('/api/rooms/:roomId/submit', route(async (req, res) => {
     const { roomId } = req.params;
-    const { design } = req.body;
-    let room = roomsStore.get(roomId);
-    if (!room) {
-      room = {
-        id: roomId,
-        name: `Sala ${roomId}`,
-        problemId: design.problemId || 'black-friday-crash',
-        createdAt: new Date().toISOString(),
-        participants: [],
-        submissions: []
-      };
-      roomsStore.set(roomId, room);
-    }
+    const userId = userIdOf(req);
+    const { hasVoted, ...design } = req.body.design;
+    const room = await updateRoom(roomId, (r) => {
+      const next = r ?? blankRoom(roomId, design.problemId || 'black-friday-crash');
+      const idx = next.submissions.findIndex((s) => s.id === design.id);
+      if (idx >= 0) {
+        // Votes are server-owned; keep the existing tally on resubmit
+        const { votes, voters } = next.submissions[idx];
+        next.submissions[idx] = { ...design, votes, voters };
+      } else {
+        const voters = hasVoted && userId ? [userId] : [];
+        next.submissions.unshift({ ...design, votes: voters.length, voters });
+      }
+      return next;
+    });
+    res.json(viewFor(room, userId));
+  }));
 
-    const idx = room.submissions.findIndex((s) => s.id === design.id);
-    if (idx >= 0) {
-      room.submissions[idx] = design;
-    } else {
-      room.submissions.unshift(design);
-    }
-    res.json(room);
-  });
-
-  // API: Vote design
-  app.post('/api/rooms/:roomId/vote', (req, res) => {
+  // API: Vote design (toggles this user's vote)
+  app.post('/api/rooms/:roomId/vote', route(async (req, res) => {
     const { roomId } = req.params;
     const { designId } = req.body;
-    const room = roomsStore.get(roomId);
-    if (!room) {
+    const userId = userIdOf(req);
+    if (!userId) return res.status(400).json({ error: 'Missing X-User-Id' });
+    if (!(await getRoom(roomId))) {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    room.submissions = room.submissions.map((sub) => {
-      if (sub.id === designId) {
-        const hasVoted = !sub.hasVoted;
+    const room = await updateRoom(roomId, (r) => {
+      const next = r ?? blankRoom(roomId);
+      next.submissions = next.submissions.map((sub) => {
+        if (sub.id !== designId) return sub;
+        const voters: string[] = sub.voters ?? [];
+        const voted = voters.includes(userId);
         return {
           ...sub,
-          votes: hasVoted ? sub.votes + 1 : Math.max(0, sub.votes - 1),
-          hasVoted
+          voters: voted ? voters.filter((v) => v !== userId) : [...voters, userId],
+          votes: voted ? Math.max(0, sub.votes - 1) : sub.votes + 1
         };
-      }
-      return sub;
+      });
+      return next;
     });
-
-    res.json(room);
-  });
+    res.json(viewFor(room, userId));
+  }));
 
   // API: Update room problem
-  app.post('/api/rooms/:roomId/problem', (req, res) => {
+  app.post('/api/rooms/:roomId/problem', route(async (req, res) => {
     const { roomId } = req.params;
     const { problemId } = req.body;
-    let room = roomsStore.get(roomId);
-    if (!room) {
-      room = {
-        id: roomId,
-        name: `Sala ${roomId}`,
-        problemId,
-        createdAt: new Date().toISOString(),
-        participants: [],
-        submissions: []
-      };
-      roomsStore.set(roomId, room);
-    } else {
-      room.problemId = problemId;
-    }
-    res.json(room);
-  });
+    const room = await updateRoom(roomId, (r) => {
+      const next = r ?? blankRoom(roomId, problemId);
+      next.problemId = problemId;
+      return next;
+    });
+    res.json(viewFor(room, userIdOf(req)));
+  }));
 
   // API: Heartbeat
-  app.post('/api/rooms/:roomId/heartbeat', (req, res) => {
+  app.post('/api/rooms/:roomId/heartbeat', route(async (req, res) => {
     const { roomId } = req.params;
     const { participant } = req.body;
-    const room = roomsStore.get(roomId);
-    if (room && participant) {
-      const idx = room.participants.findIndex((p) => p.id === participant.id);
-      if (idx >= 0) {
-        room.participants[idx] = { ...participant, lastSeen: Date.now() };
-      } else {
-        room.participants.push({ ...participant, lastSeen: Date.now() });
-      }
+    if (participant && (await getRoom(roomId))) {
+      await updateRoom(roomId, (r) => {
+        const next = r!;
+        const now = Date.now();
+        next.participants = [
+          ...next.participants.filter((p) => p.id !== participant.id && now - p.lastSeen < STALE_MS),
+          { ...participant, lastSeen: now }
+        ];
+        return next;
+      });
     }
     res.json({ ok: true });
-  });
+  }));
 
   const isProduction = process.env.NODE_ENV === 'production';
   if (isProduction) {
@@ -184,6 +223,8 @@ async function startServer() {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   } else {
+    // Loaded lazily so production doesn't need vite at runtime
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
@@ -193,10 +234,11 @@ async function startServer() {
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server ready on port ${PORT}`);
+    console.log(`Server ready on port ${PORT} (rooms: ${pool ? 'postgres' : 'memory'})`);
   });
 }
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err);
+  process.exit(1);
 });

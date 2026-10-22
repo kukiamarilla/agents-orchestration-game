@@ -7,6 +7,7 @@ import {
   createNewRoom,
   submitMultiAgentDesign,
   voteMultiAgentDesign,
+  clientId,
   updateRoomProblem,
   sendHeartbeat,
   subscribeToRoomBroadcast
@@ -144,9 +145,9 @@ export default function App() {
   useEffect(() => {
     loadRoom();
 
-    // Send heartbeat
-    sendHeartbeat(roomId, {
-      id: `usr-${authorName.toLowerCase().replace(/\s+/g, '-')}`,
+    // Send heartbeat (repeated while polling, otherwise we'd be pruned as stale after 2 min)
+    const heartbeat = () => sendHeartbeat(roomId, {
+      id: clientId,
       name: authorName,
       avatar: makerAgents[0]?.muñequito || {
         skinColor: '#10b981',
@@ -160,9 +161,12 @@ export default function App() {
       lastSeen: Date.now()
     });
 
+    heartbeat();
+
     // Polling sync every 5 seconds for live multi-user updates
     const pollTimer = setInterval(() => {
       loadRoom();
+      heartbeat();
     }, 5000);
 
     // Multi-tab broadcast channel listener
