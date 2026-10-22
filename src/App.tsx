@@ -19,6 +19,7 @@ import { WarRoom } from './components/WarRoom';
 import { QrModal } from './components/QrModal';
 import { RoomModal } from './components/RoomModal';
 import { NameModal } from './components/NameModal';
+import { ChallengeModal } from './components/ChallengeModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { soundFx } from './utils/audio';
 
@@ -192,8 +193,12 @@ export default function App() {
     setIsMuted(nextMuted);
   };
 
+  const [isChallengeOpen, setIsChallengeOpen] = useState(false);
+
+  // Closing the tutorial (finish or skip) presents the room's challenge
   const handleCloseOnboarding = () => {
     setIsOnboardingOpen(false);
+    setIsChallengeOpen(true);
     try {
       localStorage.setItem(STORAGE_KEY_ONBOARDED, 'true');
     } catch {}
@@ -403,6 +408,17 @@ export default function App() {
         onNavigateToView={(view) => {
           setActiveView(view);
           handleCloseOnboarding();
+        }}
+      />
+
+      <ChallengeModal
+        isOpen={isChallengeOpen && !isOnboardingOpen}
+        problem={activeProblem}
+        roomName={room.name}
+        onClose={() => setIsChallengeOpen(false)}
+        onStart={() => {
+          setIsChallengeOpen(false);
+          setActiveView('maker');
         }}
       />
     </div>
