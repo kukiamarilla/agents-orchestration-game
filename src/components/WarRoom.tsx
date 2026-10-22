@@ -6,7 +6,6 @@ import { soundFx } from '../utils/audio';
 import {
   Users,
   QrCode,
-  Sparkles,
   Star,
   Eye,
   Plus,
@@ -26,7 +25,6 @@ interface WarRoomProps {
   onSelectProblem: (problemId: string) => void;
   onOpenQrModal: () => void;
   onVoteSubmission: (submissionId: string) => void;
-  onCloneSubmission: (design: MultiAgentDesign) => void;
   onNavigateToMaker: () => void;
   onRefreshRoom?: () => void;
   onOpenRoomModal: () => void;
@@ -39,7 +37,6 @@ export const WarRoom: React.FC<WarRoomProps> = ({
   onSelectProblem,
   onOpenQrModal,
   onVoteSubmission,
-  onCloneSubmission,
   onNavigateToMaker,
   onRefreshRoom,
   onOpenRoomModal
@@ -356,18 +353,6 @@ export const WarRoom: React.FC<WarRoomProps> = ({
                       <Eye className="w-3.5 h-3.5" />
                       <span>Ver Diagrama</span>
                     </button>
-
-                    <button
-                      onClick={() => {
-                        soundFx.playCoin();
-                        onCloneSubmission(sub);
-                      }}
-                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-arcade tracking-wider transition-colors flex items-center gap-1"
-                      title="Clonar este enjambre en tu Builder para editarlo"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Clonar</span>
-                    </button>
                   </div>
                 </div>
               );
@@ -393,13 +378,7 @@ export const WarRoom: React.FC<WarRoomProps> = ({
             </div>
 
             <div className="p-6 overflow-y-auto">
-              <AgentDiagramView
-                design={inspectingDesign}
-                onClone={() => {
-                  onCloneSubmission(inspectingDesign);
-                  setInspectingDesign(null);
-                }}
-              />
+              <AgentDiagramView design={inspectingDesign} />
             </div>
           </div>
         </div>

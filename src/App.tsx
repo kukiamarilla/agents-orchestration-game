@@ -18,11 +18,13 @@ import { AgentDiagramView } from './components/AgentDiagramView';
 import { WarRoom } from './components/WarRoom';
 import { QrModal } from './components/QrModal';
 import { RoomModal } from './components/RoomModal';
+import { NameModal } from './components/NameModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { soundFx } from './utils/audio';
 
 const STORAGE_KEY_ONBOARDED = 'vibeagent_onboarded_v2';
-const STORAGE_KEY_USER_NAME = 'vibeagent_author_name_v2';
+// v3: older versions auto-assigned a random name, so everyone is asked once
+const STORAGE_KEY_USER_NAME = 'vibeagent_author_name_v3';
 
 export default function App() {
   const [activeView, setActiveView] = useState<'maker' | 'war_room' | 'diagram'>('maker');
@@ -30,20 +32,23 @@ export default function App() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 
-  // Author identity
-  const [authorName] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY_USER_NAME);
-      if (saved) return saved;
-      const names = ['Kuki SRE', 'Vibe Hacker', 'Pixel Coder', 'Nexus Architect', 'Cyber Dev'];
-      const picked = names[Math.floor(Math.random() * names.length)];
-      try {
-        localStorage.setItem(STORAGE_KEY_USER_NAME, picked);
-      } catch {}
-      return picked;
+  // Author identity (empty until the player types it in NameModal)
+  const [authorName, setAuthorName] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_USER_NAME) || '';
+    } catch {
+      return '';
     }
-    return 'Vibe Coder';
   });
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+
+  const handleSaveName = (name: string) => {
+    setAuthorName(name);
+    setIsNameModalOpen(false);
+    try {
+      localStorage.setItem(STORAGE_KEY_USER_NAME, name);
+    } catch {}
+  };
 
   // Room ID from URL (e.g. ?room=SALA-BLACKFRIDAY)
   const [roomId, setRoomId] = useState<string>(() => {
@@ -146,7 +151,7 @@ export default function App() {
     loadRoom();
 
     // Send heartbeat (repeated while polling, otherwise we'd be pruned as stale after 2 min)
-    const heartbeat = () => sendHeartbeat(roomId, {
+    const heartbeat = () => authorName && sendHeartbeat(roomId, {
       id: clientId,
       name: authorName,
       avatar: makerAgents[0]?.muñequito || {
@@ -259,17 +264,6 @@ export default function App() {
     setRoom(updated);
   };
 
-  const handleCloneSubmission = (design: MultiAgentDesign) => {
-    soundFx.playCoin();
-    setMakerAgents(
-      design.agents.map((a) => ({
-        ...a,
-        id: `agent-clone-${Math.random().toString(36).substring(2, 7)}`
-      }))
-    );
-    setActiveView('maker');
-  };
-
   // Convert current maker state to a preview design object for AgentDiagramView
   const currentMakerDesign: MultiAgentDesign = {
     id: 'current-preview',
@@ -308,6 +302,8 @@ export default function App() {
         onOpenQrModal={() => setIsQrModalOpen(true)}
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
+        authorName={authorName}
+        onEditName={() => setIsNameModalOpen(true)}
       />
 
       {/* Main Container */}
@@ -348,7 +344,6 @@ export default function App() {
 
             <AgentDiagramView
               design={currentMakerDesign}
-              showCloneButton={false}
               onUpdateAgents={(updatedAgents) => {
                 setMakerAgents(updatedAgents);
               }}
@@ -369,7 +364,6 @@ export default function App() {
             onSelectProblem={handleChangeRoomProblem}
             onOpenQrModal={() => setIsQrModalOpen(true)}
             onVoteSubmission={handleVoteSubmission}
-            onCloneSubmission={handleCloneSubmission}
             onNavigateToMaker={() => setActiveView('maker')}
             onRefreshRoom={loadRoom}
             onOpenRoomModal={() => setIsRoomModalOpen(true)}
@@ -393,9 +387,18 @@ export default function App() {
         problem={activeProblem}
       />
 
+      {/* Name prompt: required on first entry, editable from the top nav */}
+      <NameModal
+        key={authorName}
+        isOpen={!authorName || isNameModalOpen}
+        currentName={authorName}
+        onSave={handleSaveName}
+        onClose={authorName ? () => setIsNameModalOpen(false) : undefined}
+      />
+
       {/* Onboarding Guide Modal */}
       <OnboardingModal
-        isOpen={isOnboardingOpen}
+        isOpen={isOnboardingOpen && !!authorName}
         onClose={handleCloseOnboarding}
         onNavigateToView={(view) => {
           setActiveView(view);

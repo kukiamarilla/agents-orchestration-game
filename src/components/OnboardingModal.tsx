@@ -441,12 +441,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-300 font-arcade">
-                  SALA DE GUERRA: PUBLICA, VOTA Y CLONA
+                  SALA DE GUERRA: PUBLICA Y VOTA
                 </span>
                 <Users className="w-3.5 h-3.5 text-emerald-400" />
               </div>
               <p className="text-xs text-slate-300 mt-1">
-                Publica tu solución al desafío. Todos los miembros de la sala (o quienes se unan con el Código QR) verán tu diseño. Puedes votar por las mejores ideas y con 1 click <strong className="text-amber-300">clonar la arquitectura de otro</strong> a tu taller para aprender de ella.
+                Publica tu solución al desafío. Todos los miembros de la sala (o quienes se unan con el Código QR) verán tu diseño. Puedes votar por las mejores ideas.
               </p>
             </div>
           </div>

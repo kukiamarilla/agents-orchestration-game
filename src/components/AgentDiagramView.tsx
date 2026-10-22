@@ -22,16 +22,12 @@ type DiagramMode = 'move' | 'connect_comm' | 'connect_spawn' | 'disconnect';
 
 interface AgentDiagramViewProps {
   design: MultiAgentDesign;
-  onClone?: () => void;
-  showCloneButton?: boolean;
   onUpdateAgentPosition?: (agentId: string, position: { x: number; y: number }) => void;
   onUpdateAgents?: (agents: AgentNode[]) => void;
 }
 
 export const AgentDiagramView: React.FC<AgentDiagramViewProps> = ({
   design,
-  onClone,
-  showCloneButton = true,
   onUpdateAgentPosition,
   onUpdateAgents
 }) => {
@@ -484,18 +480,6 @@ export const AgentDiagramView: React.FC<AgentDiagramViewProps> = ({
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">Resetear</span>
           </button>
-
-          {showCloneButton && onClone && (
-            <button
-              onClick={() => {
-                soundFx.playCoin();
-                onClone();
-              }}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-arcade tracking-wider font-bold transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>✨ Clonar al Taller</span>
-            </button>
-          )}
         </div>
       </div>
 

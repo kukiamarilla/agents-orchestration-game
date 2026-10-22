@@ -93,5 +93,24 @@ export const PROBLEMS_CATALOG: Problem[] = [
     recommendedBrainType: 'deep-reasoning',
     conceptualClue: 'El problema está en la capa de contenedores y en los archivos de configuración de despliegue. Necesitás acceso al motor de virtualización y capacidad de editar archivos del repo.',
     winCriteria: 'Reiniciar contenedor con Docker MCP y aplicar parche de memoria.'
+  },
+  {
+    id: 'presidential-campaign',
+    title: 'Campaña Presidencial: Llegar al Palacio',
+    emoji: '🏛️',
+    category: 'politics',
+    difficulty: 'Pesadilla',
+    severity: 'P1 - Crítico',
+    description: 'Tu candidato arranca 3° en las encuestas a 90 días de la elección. Armá un equipo de agentes que escuche a los votantes, coordine voluntarios, recaude fondos de forma legal, desmienta fake news y gane el debate final.',
+    contextLogs: [
+      'ENCUESTA [semana 1]: Rival A 34% | Rival B 29% | Tu candidato 18% | Indecisos 19%',
+      'ALERTA [redes]: Video falso del candidato viralizándose en WhatsApp (120k reenvíos)',
+      'TSE: Cierre de padrón en 30 días | Tope legal de aportes por persona vigente'
+    ],
+    requiredCapabilities: ['social', 'communication', 'database', 'payments'],
+    optimalTools: ['encuestas', 'padron_electoral', 'whatsapp_business', 'fact_checker', 'x_twitter', 'donaciones', 'agenda_campana'],
+    recommendedBrainType: 'deep-reasoning',
+    conceptualClue: 'Una campaña es un enjambre: alguien tiene que medir qué piensa la gente, otro tiene que hablarle a cada barrio por su canal, otro tiene que cuidar la plata y la ley, y otro tiene que apagar incendios de desinformación antes de que se viralicen. Un solo agente no llega a todo.',
+    winCriteria: 'Superar el 50% en la encuesta final: segmentar indecisos con Encuestas + Padrón, movilizar con WhatsApp y redes, desmentir la fake news con Fact-Checker y recaudar sin pasar el tope legal.'
   }
 ];

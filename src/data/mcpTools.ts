@@ -250,5 +250,111 @@ export const MCP_TOOLS: McpTool[] = [
       { name: 'reply_direct_message(userId, message)', description: 'Responde a usuarios afectados por mensaje privado.', parameters: ['userId', 'message'] },
       { name: 'monitor_mentions()', description: 'Rastrea menciones de la marca y quejas de clientes en posts.', parameters: [] }
     ]
+  },
+  {
+    id: 'encuestas',
+    name: 'Encuestas & Sondeos MCP',
+    emoji: '📊',
+    category: 'database',
+    vendor: 'Opinión Pública',
+    description: 'Lanza encuestas, cruza intención de voto por región y edad, y detecta qué temas mueven a los indecisos.',
+    badgeColor: '#0ea5e9',
+    iconName: 'activity',
+    requiredForTags: ['politics', 'polling', 'data'],
+    methods: [
+      { name: 'run_poll(questions, sample)', description: 'Lanza una encuesta a una muestra representativa.', parameters: ['questions', 'sample'] },
+      { name: 'voting_intention(region, ageRange)', description: 'Devuelve intención de voto segmentada.', parameters: ['region', 'ageRange'] },
+      { name: 'top_concerns(segment)', description: 'Lista los temas que más preocupan a un segmento.', parameters: ['segment'] }
+    ]
+  },
+  {
+    id: 'padron_electoral',
+    name: 'Padrón Electoral MCP',
+    emoji: '🗳️',
+    category: 'database',
+    vendor: 'Justicia Electoral',
+    description: 'Consulta datos públicos del padrón: votantes por circunscripción, locales de votación y mesas.',
+    badgeColor: '#16a34a',
+    iconName: 'database',
+    requiredForTags: ['politics', 'voters', 'territory'],
+    methods: [
+      { name: 'voters_by_district(district)', description: 'Cantidad de electores habilitados por distrito.', parameters: ['district'] },
+      { name: 'polling_stations(district)', description: 'Lista locales y mesas de votación.', parameters: ['district'] }
+    ]
+  },
+  {
+    id: 'whatsapp_business',
+    name: 'WhatsApp Business MCP',
+    emoji: '🟢',
+    category: 'communication',
+    vendor: 'Meta Messaging',
+    description: 'Coordina grupos de voluntarios por barrio y envía mensajes a simpatizantes que aceptaron recibirlos.',
+    badgeColor: '#25d366',
+    iconName: 'message-square',
+    requiredForTags: ['politics', 'volunteers', 'messaging'],
+    methods: [
+      { name: 'broadcast_to_optins(segment, message)', description: 'Envía un mensaje a quienes dieron consentimiento.', parameters: ['segment', 'message'] },
+      { name: 'coordinate_volunteers(district, task)', description: 'Asigna tareas a los voluntarios de un barrio.', parameters: ['district', 'task'] }
+    ]
+  },
+  {
+    id: 'x_twitter',
+    name: 'X (Twitter) MCP',
+    emoji: '𝕏',
+    category: 'social',
+    vendor: 'X Corp',
+    description: 'Publica posiciones del candidato, mide tendencias y responde en tiempo real durante debates.',
+    badgeColor: '#0f172a',
+    iconName: 'globe',
+    requiredForTags: ['politics', 'social', 'debate'],
+    methods: [
+      { name: 'post_thread(messages)', description: 'Publica un hilo con propuestas.', parameters: ['messages'] },
+      { name: 'trending_topics(country)', description: 'Lee los temas en tendencia del país.', parameters: ['country'] }
+    ]
+  },
+  {
+    id: 'fact_checker',
+    name: 'Fact-Checker MCP',
+    emoji: '🧐',
+    category: 'automation',
+    vendor: 'Verificación de Datos',
+    description: 'Detecta contenido manipulado o falso que circula sobre el candidato y arma desmentidas con fuentes.',
+    badgeColor: '#f59e0b',
+    iconName: 'search',
+    requiredForTags: ['politics', 'disinformation', 'verification'],
+    methods: [
+      { name: 'verify_claim(text_or_media)', description: 'Verifica si un contenido es real, editado o generado.', parameters: ['text_or_media'] },
+      { name: 'build_rebuttal(claimId)', description: 'Arma una desmentida con fuentes verificables.', parameters: ['claimId'] }
+    ]
+  },
+  {
+    id: 'donaciones',
+    name: 'Donaciones de Campaña MCP',
+    emoji: '🪙',
+    category: 'payments',
+    vendor: 'Finanzas Electorales',
+    description: 'Recibe aportes, valida identidad del donante y bloquea los que superan el tope legal. Genera el reporte para la Justicia Electoral.',
+    badgeColor: '#a855f7',
+    iconName: 'credit-card',
+    requiredForTags: ['politics', 'fundraising', 'compliance'],
+    methods: [
+      { name: 'receive_donation(donorId, amount)', description: 'Registra un aporte si cumple el tope legal.', parameters: ['donorId', 'amount'] },
+      { name: 'compliance_report()', description: 'Genera el informe de financiamiento para el órgano electoral.', parameters: [] }
+    ]
+  },
+  {
+    id: 'agenda_campana',
+    name: 'Agenda de Campaña MCP',
+    emoji: '📅',
+    category: 'productivity',
+    vendor: 'Logística',
+    description: 'Planifica la gira del candidato: actos, entrevistas y debates según dónde están los indecisos.',
+    badgeColor: '#ef4444',
+    iconName: 'file-text',
+    requiredForTags: ['politics', 'logistics', 'events'],
+    methods: [
+      { name: 'schedule_event(city, date, type)', description: 'Agenda un acto, entrevista o debate.', parameters: ['city', 'date', 'type'] },
+      { name: 'optimize_tour(priorityDistricts)', description: 'Arma la ruta de gira priorizando distritos clave.', parameters: ['priorityDistricts'] }
+    ]
   }
 ];

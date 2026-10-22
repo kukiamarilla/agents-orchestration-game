@@ -85,7 +85,7 @@ export interface Problem {
   title: string;
   emoji: string;
   image?: string;
-  category: 'devops' | 'security' | 'data' | 'support' | 'ecommerce';
+  category: 'devops' | 'security' | 'data' | 'support' | 'ecommerce' | 'politics';
   difficulty: 'Fácil' | 'Medio' | 'Difícil' | 'Pesadilla';
   severity: 'P1 - Crítico' | 'P2 - Alto' | 'P3 - Medio';
   description: string;

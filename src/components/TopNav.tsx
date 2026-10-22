@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, QrCode, HelpCircle, Layers, Grid, Users, Plus, ChevronDown } from 'lucide-react';
+import { Volume2, VolumeX, QrCode, HelpCircle, Layers, Grid, Users, Plus, ChevronDown, UserRound } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 
 interface TopNavProps {
@@ -11,6 +11,8 @@ interface TopNavProps {
   onOpenQrModal: () => void;
   onOpenOnboarding: () => void;
   onOpenRoomModal: () => void;
+  authorName: string;
+  onEditName: () => void;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -21,7 +23,9 @@ export const TopNav: React.FC<TopNavProps> = ({
   onToggleMute,
   onOpenQrModal,
   onOpenOnboarding,
-  onOpenRoomModal
+  onOpenRoomModal,
+  authorName,
+  onEditName
 }) => {
   return (
     <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-40">
@@ -95,6 +99,18 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => {
+            soundFx.playClick();
+            onEditName();
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500 text-slate-200 hover:text-white text-xs font-mono transition-all cursor-pointer max-w-[10rem]"
+          title="Cambiar tu nombre"
+        >
+          <UserRound className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="truncate hidden sm:inline">{authorName || 'Sin nombre'}</span>
+        </button>
+
         <button
           onClick={() => {
             soundFx.playClick();
